@@ -1,0 +1,23 @@
+{
+  "name": "space-factory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cosmic Pulse: 3D space music videos, edited to the beat of the soundtrack",
+  "type": "module",
+  "scripts": {
+    "doctor": "node src/doctor.js",
+    "daily": "node src/inbox.js && npm run make",
+    "make": "node src/generate-episodes.js && node src/pipeline.js --format compilation --scale 1.3333 --export ./export && node src/pipeline.js --format music-short --export ./export/shorts",
+    "make:preview": "node src/generate-episodes.js && node src/pipeline.js --format compilation --scale 0.5 --fps 24 --export ./export-preview && node src/pipeline.js --format music-short --scale 0.5 --fps 24 --export ./export-preview/shorts",
+    "inbox": "node src/inbox.js",
+    "status": "node src/status.js",
+    "episodes": "node src/generate-episodes.js",
+    "produce": "node src/pipeline.js",
+    "preview": "node src/serve.js",
+    "logo": "node src/logo.js"
+  },
+  "dependencies": {
+    "playwright": "1.56.1",
+    "three": "0.180.0"
+  }
+}

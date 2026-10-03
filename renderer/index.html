@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Space Factory renderer</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; width: 100vw; height: 100vh; }
+  canvas { display: block; }
+  #fade { position: absolute; inset: 0; background: #000; pointer-events: none; }
+  #flash { position: absolute; inset: 0; background: #fff; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
+  #title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif; text-align: center; pointer-events: none; }
+  #title h1 { font-size: 6.2vh; letter-spacing: .04em; margin: 0 6vw; text-shadow: 0 0 3vh rgba(120,170,255,.6); font-weight: 700; }
+  #title p { font-size: 2.6vh; opacity: .75; margin-top: 2vh; letter-spacing: .3em; text-transform: uppercase; }
+  #cap { position: absolute; left: 8%; right: 8%; bottom: 7%; text-align: center; color: #fff;
+    font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif; font-size: 3.4vh; line-height: 1.35; font-weight: 600;
+    text-shadow: 0 0 .6vh #000, 0 0 1.4vh #000; pointer-events: none; }
+  #label { position: absolute; left: 5%; top: 6%; color: #cfe0ff; font-family: 'DejaVu Sans', sans-serif; font-size: 2.2vh;
+    letter-spacing: .25em; text-transform: uppercase; opacity: 0; pointer-events: none; }
+  #label b { display: block; font-size: 1.5vh; opacity: .6; letter-spacing: .3em; margin-bottom: .6vh; font-weight: 400; }
+  body.vertical #cap { bottom: 18%; font-size: 2.6vh; }
+  body.vertical #title h1 { font-size: 4.2vh; }
+</style>
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="stage"><div id="fade"></div><div id="flash"></div><div id="label"></div><div id="title"></div><div id="cap"></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { SCENES, starfield } from './scenes.js';
+
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.getElementById('stage').prepend(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(W > H ? 50 : 70, W / H, 0.1, 3000);
+const scene = new THREE.Scene();
+const $ = (id) => document.getElementById(id);
+const smooth = (k) => k * k * (3 - 2 * k);
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+let plan = null, bg = null, active = { index: -1, built: null };
+// Particle sizes are tuned for 1080p; scale them so 1440p/2160p renders look the same, just sharper.
+const PIX = Math.min(W, H) / 1080;
+const setPix = (o) => { if (o.material?.uniforms?.uPix) o.material.uniforms.uPix.value = PIX; };
+
+function build(index) {
+  if (active.built) for (const o of active.built.objects) { scene.remove(o); o.geometry?.dispose?.(); o.material?.dispose?.(); }
+  const s = plan.scenes[index];
+  const make = SCENES[s.type];
+  if (!make) throw new Error(`unknown scene type ${s.type}`);
+  active = { index, built: make({ seed: s.seed, ...s.params }) };
+  for (const o of active.built.objects) { setPix(o); scene.add(o); }
+}
+
+// The renderer's whole public API: two functions driven by the Node pipeline.
+window.setup = (p) => {
+  plan = p;
+  if (p.vertical) document.body.classList.add('vertical');
+  bg = starfield(p.seed);
+  setPix(bg);
+  scene.add(bg);
+  $('title').innerHTML = `<h1>${p.title}</h1>${p.subtitle ? `<p>${p.subtitle}</p>` : ''}`;
+  return { frames: Math.ceil(p.duration * p.fps) };
+};
+
+window.renderFrame = (frame) => {
+  const T = frame / plan.fps;
+  let i = plan.scenes.findIndex((s) => T >= s.start && T < s.start + s.duration);
+  if (i < 0) i = plan.scenes.length - 1;
+  if (i !== active.index) build(i);
+  const s = plan.scenes[i];
+  const t = T - s.start;
+  const p = Math.min(1, t / s.duration);
+
+  active.built.update(t, p);
+  bg.material.uniforms.uTime.value = T;
+
+  // Music reactivity: kick pulse, section energy, high-end shimmer (0..1 each).
+  const A = plan.audio;
+  const pulse = A ? A.pulse[Math.min(frame, A.pulse.length - 1)] : 0;
+  const energy = A ? A.energy[Math.min(frame, A.energy.length - 1)] : 0;
+  const bright = A ? A.bright[Math.min(frame, A.bright.length - 1)] : 0;
+  const kick = 1 + 0.22 * pulse;
+  if (A) {
+    for (const o of active.built.objects) {
+      if (o.isSprite) o.scale.multiplyScalar(kick);
+      const u = o.material?.uniforms;
+      if (u?.uSize) { o.userData.baseSize ??= u.uSize.value; u.uSize.value = o.userData.baseSize * (1 + 0.3 * pulse + 0.15 * bright); }
+    }
+    renderer.toneMappingExposure = 0.9 + 0.15 * energy + 0.25 * pulse;
+  }
+
+  // Camera: a scene is filmed as one or more shots; each shot dollies while orbiting.
+  const shot = s.shots?.find((x) => t >= x.start && t < x.end) ?? s.shots?.at(-1);
+  const st = shot ? t - shot.start : t;
+  const sp = shot ? Math.min(1, st / (shot.end - shot.start)) : p;
+  const c = { dist: [90, 60], height: [20, 12], orbit: 0.05, start: 0, ...(shot?.camera ?? s.camera) };
+  const k = ease(sp);
+  const ang = c.start + st * c.orbit;
+  const d = lerp(c.dist[0], c.dist[1], k) * (1 - 0.035 * pulse);
+  const h = lerp(c.height[0], c.height[1], k);
+  camera.position.set(Math.sin(ang) * d, h, Math.cos(ang) * d);
+  camera.lookAt(0, 0, 0);
+
+  // Fades: narrated edits dissolve; music edits hard-cut on the bar (tiny dip between story beats).
+  const F = A ? 0.12 : 0.8;
+  const fin = i === 0 ? smooth(Math.min(1, t / 1.2)) : smooth(Math.min(1, t / F));
+  const fout = i === plan.scenes.length - 1 ? smooth(Math.min(1, (s.duration - t) / 1.5)) : smooth(Math.min(1, (s.duration - t) / (F / 2)));
+  $('fade').style.opacity = String(1 - Math.min(fin, fout));
+
+  // White hit on every drop.
+  const sinceDrop = Math.min(...(plan.drops ?? []).map((x) => (T >= x ? T - x : Infinity)), Infinity);
+  $('flash').style.opacity = String(sinceDrop < 0.5 ? 0.55 * (1 - sinceDrop / 0.5) : 0);
+
+  // Title card over the first seconds.
+  const tt = plan.titleSeconds ?? 4;
+  $('title').style.opacity = String(T < tt ? smooth(Math.min(1, T / 0.8)) * smooth(Math.min(1, (tt - T) / 0.8)) : 0);
+
+  // Chapter label and captions (captions are chunked to the narration timing).
+  $('label').innerHTML = s.label ? `<b>${String(i + 1).padStart(2, '0')}</b>${s.label}` : '';
+  $('label').style.opacity = String(T > tt ? Math.min(fin, fout) * 0.9 : 0);
+  const cue = (s.cues || []).find((q) => t >= q.from && t < q.to);
+  $('cap').textContent = cue && T > tt ? cue.text : '';
+
+  renderer.render(scene, camera);
+  // Undo the kick so sprites a scene doesn't rescale every frame don't grow cumulatively.
+  if (A) for (const o of active.built.objects) if (o.isSprite) o.scale.divideScalar(kick);
+  return true;
+};
+window.rendererReady = true;
+</script>
+</body>
+</html>

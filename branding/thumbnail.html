@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cosmic Pulse thumbnail</title>
+<style>
+  @font-face { font-family: 'Orbitron'; src: url('fonts/Orbitron.woff2') format('woff2'); font-weight: 400 900; }
+  @font-face { font-family: 'Montserrat'; src: url('fonts/Montserrat.woff2') format('woff2'); font-weight: 100 900; }
+  html, body { margin: 0; width: 1280px; height: 720px; overflow: hidden; background: #04030c; }
+  .bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: saturate(1.25) contrast(1.08);
+    transform: translateX(24%) scale(1.3); transform-origin: 50% 62%; }
+  .shade { position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(4,3,12,.92) 0%, rgba(4,3,12,.65) 38%, rgba(4,3,12,0) 70%),
+                radial-gradient(ellipse at 70% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,.55) 100%); }
+  .brand { position: absolute; left: 56px; top: 44px; display: flex; align-items: center; gap: 14px;
+    font-family: 'Orbitron'; font-weight: 700; font-size: 22px; letter-spacing: .18em; color: #dfe3ff; }
+  .title { position: absolute; left: 56px; bottom: 92px; width: 700px; font-family: 'Orbitron'; font-weight: 900; text-transform: uppercase;
+    line-height: 1.02; letter-spacing: .02em; color: #fff;
+    text-shadow: 0 0 28px rgba(123,92,255,.75), 0 4px 0 rgba(0,0,0,.6), 0 0 2px #000; }
+  .title .accent { background: linear-gradient(90deg, #ff4fd8, #7b5cff 45%, #21d4fd); -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: none; filter: drop-shadow(0 0 18px rgba(123,92,255,.8)) drop-shadow(0 4px 0 rgba(0,0,0,.6)); }
+  .tag { position: absolute; left: 60px; bottom: 50px; font-family: 'Montserrat'; font-weight: 500; font-size: 22px; letter-spacing: .32em;
+    color: #cfd6ff; text-transform: uppercase; opacity: .9; }
+</style>
+</head>
+<body>
+<div class="bg" id="bg"></div>
+<div class="shade"></div>
+<div class="brand">
+  <svg width="54" height="54" viewBox="0 0 200 200"><defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4fd8"/><stop offset=".45" stop-color="#7b5cff"/><stop offset="1" stop-color="#21d4fd"/></linearGradient></defs>
+    <g transform="rotate(-16 100 100)"><ellipse cx="100" cy="100" rx="88" ry="25" fill="none" stroke="url(#g)" stroke-width="9"/></g>
+    <circle cx="100" cy="100" r="50" fill="#0b0724" stroke="url(#g)" stroke-width="7"/>
+    <g transform="rotate(-16 100 100)"><path d="M 12 100 A 88 25 0 0 0 188 100" fill="none" stroke="url(#g)" stroke-width="9"/></g>
+    <path d="M 38 100 H 70 L 79 82 L 91 124 L 104 62 L 116 116 L 124 100 H 162" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  COSMIC PULSE
+</div>
+<div class="title" id="title"></div>
+<div class="tag" id="tag"></div>
+<script>
+const q = new URLSearchParams(location.search);
+document.getElementById('bg').style.backgroundImage = `url("${q.get('img')}")`;
+// Last word gets the gradient; size shrinks for long titles so it stays on 2–3 lines.
+const words = (q.get('title') || '').trim().split(/\s+/);
+const last = words.pop() || '';
+const el = document.getElementById('title');
+el.innerHTML = `${words.join(' ')} <span class="accent">${last}</span>`;
+const len = (q.get('title') || '').length;
+el.style.fontSize = `${len <= 14 ? 104 : len <= 22 ? 88 : len <= 30 ? 74 : 62}px`;
+document.getElementById('tag').textContent = q.get('tag') || '3D space · in rhythm';
+const img = new Image();
+img.onload = () => document.fonts.ready.then(() => { window.thumbReady = true; });
+img.onerror = () => { window.thumbReady = true; };
+img.src = q.get('img');
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cosmic Pulse logo</title>
+<style>
+  @font-face { font-family: 'Orbitron'; src: url('fonts/Orbitron.woff2') format('woff2'); font-weight: 400 900; }
+  @font-face { font-family: 'Montserrat'; src: url('fonts/Montserrat.woff2') format('woff2'); font-weight: 100 900; }
+  :root { --violet: #7b5cff; --cyan: #21d4fd; --pink: #ff4fd8; }
+  html, body { margin: 0; overflow: hidden; }
+  body { background: #04030c; }
+  body.transparent { background: transparent; }
+  .stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  .bg { position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 70% at 38% 50%, #1b1147 0%, #0b0724 45%, #04030c 80%); }
+  .stars { position: absolute; inset: 0; }
+  .wave { position: absolute; left: 0; width: 100%; top: 50%; transform: translateY(-50%); opacity: .35; }
+  .lockup { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 56px; }
+  .mark { display: block; }
+  .word { display: flex; flex-direction: column; }
+  .name { font-family: 'Orbitron', sans-serif; font-weight: 900; letter-spacing: .08em; line-height: 1; white-space: nowrap;
+    background: linear-gradient(90deg, #ffffff 0%, #d9d2ff 45%, var(--cyan) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(123, 92, 255, .55)); }
+  .tag { font-family: 'Montserrat', sans-serif; font-weight: 500; color: #cfd6ff; text-transform: uppercase; letter-spacing: .5em; opacity: .85; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script>
+// The mark: a ringed planet with a heartbeat / audio pulse running through it.
+function mark(size) {
+  return `
+<svg class="mark" width="${size}" height="${size}" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4fd8"/><stop offset=".45" stop-color="#7b5cff"/><stop offset="1" stop-color="#21d4fd"/>
+    </linearGradient>
+    <radialGradient id="planet" cx=".38" cy=".32" r=".8">
+      <stop offset="0" stop-color="#3a2a8f"/><stop offset=".55" stop-color="#140e3a"/><stop offset="1" stop-color="#06041a"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="rotate(-16 100 100)" filter="url(#glow)">
+    <ellipse cx="100" cy="100" rx="88" ry="25" fill="none" stroke="url(#g)" stroke-width="6" opacity=".9"/>
+  </g>
+  <circle cx="100" cy="100" r="50" fill="url(#planet)" stroke="url(#g)" stroke-width="4" filter="url(#glow)"/>
+  <g transform="rotate(-16 100 100)" filter="url(#glow)">
+    <path d="M 12 100 A 88 25 0 0 0 188 100" fill="none" stroke="url(#g)" stroke-width="6"/>
+  </g>
+  <path d="M 38 100 H 70 L 79 82 L 91 124 L 104 62 L 116 116 L 124 100 H 162" fill="none" stroke="#ffffff" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+</svg>`;
+}
+
+function stars(w, h, n, seed) {
+  let a = seed;
+  const r = () => ((a = (a * 1664525 + 1013904223) >>> 0) / 4294967296);
+  let s = `<svg class="stars" width="${w}" height="${h}">`;
+  for (let i = 0; i < n; i++) {
+    const big = r() < 0.06;
+    s += `<circle cx="${(r() * w).toFixed(1)}" cy="${(r() * h).toFixed(1)}" r="${(big ? 1.6 + r() * 1.6 : 0.5 + r() * 0.9).toFixed(2)}" fill="#fff" opacity="${(0.25 + r() * 0.7).toFixed(2)}"/>`;
+  }
+  return s + '</svg>';
+}
+
+// A long, quiet audio waveform behind the banner lockup.
+function wave(w, h) {
+  let d = `M 0 ${h / 2}`;
+  for (let x = 0; x <= w; x += 6) {
+    const env = Math.exp(-Math.pow((x - w * 0.5) / (w * 0.32), 2));
+    const y = h / 2 + Math.sin(x * 0.045) * Math.sin(x * 0.0071) * h * 0.42 * env;
+    d += ` L ${x} ${y.toFixed(1)}`;
+  }
+  return `<svg class="wave" width="${w}" height="${h}"><defs><linearGradient id="wg" x1="0" x2="1">
+    <stop offset="0" stop-color="#7b5cff" stop-opacity="0"/><stop offset=".3" stop-color="#7b5cff"/><stop offset=".7" stop-color="#21d4fd"/>
+    <stop offset="1" stop-color="#21d4fd" stop-opacity="0"/></linearGradient></defs>
+    <path d="${d}" fill="none" stroke="url(#wg)" stroke-width="3"/></svg>`;
+}
+
+const view = new URLSearchParams(location.search).get('view') || 'banner';
+const W = innerWidth, H = innerHeight, st = document.getElementById('stage');
+if (view === 'banner') {
+  // 2560x1440; everything important inside the 1546x423 centre safe area.
+  st.innerHTML = `<div class="bg"></div>${stars(W, H, 900, 7)}${wave(W, 380)}
+    <div class="lockup">${mark(330)}<div class="word"><div class="name" style="font-size:104px">COSMIC PULSE</div>
+    <div class="tag" style="font-size:34px;margin-top:26px">The universe · in rhythm</div></div></div>`;
+} else if (view === 'avatar') {
+  st.innerHTML = `<div class="bg" style="background:radial-gradient(circle at 50% 50%, #1b1147 0%, #0b0724 50%, #04030c 80%)"></div>
+    ${stars(W, H, 120, 3)}<div class="lockup">${mark(Math.round(W * 0.8))}</div>`;
+} else if (view === 'logo') {
+  // Transparent horizontal lockup for watermarks / end screens.
+  document.body.classList.add('transparent');
+  st.innerHTML = `<div class="lockup" style="gap:36px">${mark(220)}<div class="word"><div class="name" style="font-size:92px">COSMIC PULSE</div>
+    <div class="tag" style="font-size:24px;margin-top:18px">The universe · in rhythm</div></div></div>`;
+}
+document.fonts.ready.then(() => { window.logoReady = true; });
+</script>
+</body>
+</html>
