@@ -82,7 +82,7 @@ const STAGES = {
   async render(ep, dir, st) {
     const plan = st.plan;
     const total = Math.ceil(plan.duration * plan.fps);
-    const SEG = 240;
+    const SEG = 120; // 4 s at 30 fps: little work is lost if the machine stops
     const key = createHash('md5').update(JSON.stringify(plan)).digest('hex').slice(0, 10);
     const segDir = path.join(dir, `segments-${key}`);
     // Segments from an older plan can't be reused.
